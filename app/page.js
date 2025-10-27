@@ -3,7 +3,8 @@
 import { useState } from "react"
 import Sidebar from "@/components/sidebar"
 import Header from "@/components/header"
-import ProvidersSection from "@/components/providers-section"
+import ProvidersSection from "@/components/providers/providers-section"
+import ContractsSection from "@/components/contracts/contracts-section"
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState("proveedores")
@@ -17,12 +18,7 @@ export default function Home() {
 
         <main className="flex-1 overflow-y-auto p-6">
           {activeSection === "proveedores" && <ProvidersSection />}
-          {activeSection === "contratos" && (
-            <div className="text-center py-12">
-              <h2 className="text-2xl font-semibold text-foreground">Contratos</h2>
-              <p className="text-muted-foreground mt-2">Sección en desarrollo</p>
-            </div>
-          )}
+          {activeSection === "contratos" && <ContractsSection />}
           {activeSection === "ordenes" && (
             <div className="text-center py-12">
               <h2 className="text-2xl font-semibold text-foreground">Órdenes de Compra</h2>

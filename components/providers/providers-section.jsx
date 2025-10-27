@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Search, Plus, Eye, Pencil, Trash2, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import ProviderModal from "@/components/provider-modal"
+import ProviderModal from "@/components/providers/provider-modal"
 
 const initialProviders = [
   {

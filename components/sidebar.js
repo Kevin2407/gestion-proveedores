@@ -17,7 +17,7 @@ const menuItems = [
 export default function Sidebar({ activeSection, setActiveSection }) {
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col">
-      <div className="p-6 border-b border-border">
+      <div className="p-[17.5px] border-b border-border">
         <h1 className="text-xl font-bold text-foreground">Sistema de Gestión</h1>
       </div>
 
