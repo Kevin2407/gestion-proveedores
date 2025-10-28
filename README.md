@@ -32,7 +32,7 @@ Aplicación web creada con Next.js para administrar proveedores, órdenes de com
    ```env
    DB_SERVER=localhost
    DB_PORT=1433
-   DB_DATABASE=TuBaseDeDatos
+   DB_DATABASE=Sistema_Gestion_Proveedores
    DB_USER=sa
    DB_PASSWORD=TuPasswordSegura
    DB_ENCRYPT=false
