@@ -1,37 +1,73 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Star } from "lucide-react"
+import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export default function ProviderModal({ isOpen, onClose, onSave, provider }) {
   const [formData, setFormData] = useState({
+    id_proveedor: null,
+    id_persona: null,
+    id_direccion: null,
     nombre: "",
-    cuit: "",
-    fechaAlta: new Date().toISOString().split("T")[0],
-    direccion: "",
-    calificacion: 5,
+    documento: "",
+    correo: "",
+    telefono: "",
+    fecha_alta: new Date().toISOString().split("T")[0],
+    calle: "",
+    numero: "",
+    departamento: "",
+    codigo_postal: "",
   })
 
   useEffect(() => {
     if (provider) {
-      setFormData(provider)
+      setFormData({
+        id_proveedor: provider.id_proveedor,
+        id_persona: provider.id_persona,
+        id_direccion: provider.id_direccion,
+        nombre: provider.nombre || "",
+        documento: provider.documento || "",
+        correo: provider.correo || "",
+        telefono: provider.telefono || "",
+        fecha_alta: provider.fecha_alta ? provider.fecha_alta.slice(0, 10) : new Date().toISOString().split("T")[0],
+        calle: provider.calle || "",
+        numero: provider.numero ? String(provider.numero) : "",
+        departamento: provider.departamento || "",
+        codigo_postal: provider.codigo_postal || "",
+      })
     } else {
       setFormData({
+        id_proveedor: null,
+        id_persona: null,
+        id_direccion: null,
         nombre: "",
-        cuit: "",
-        fechaAlta: new Date().toISOString().split("T")[0],
-        direccion: "",
-        calificacion: 5,
+        documento: "",
+        correo: "",
+        telefono: "",
+        fecha_alta: new Date().toISOString().split("T")[0],
+        calle: "",
+        numero: "",
+        departamento: "",
+        codigo_postal: "",
       })
     }
   }, [provider, isOpen])
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSave(formData)
+    const payload = {
+      ...formData,
+      numero: formData.numero === "" ? null : Number(formData.numero),
+      telefono: formData.telefono.trim() || null,
+      correo: formData.correo.trim() || null,
+      departamento: formData.departamento.trim() || null,
+      codigo_postal: formData.codigo_postal.trim() || null,
+    }
+
+    onSave(payload)
   }
 
   if (!isOpen) return null
@@ -59,58 +95,89 @@ export default function ProviderModal({ isOpen, onClose, onSave, provider }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cuit">CUIT</Label>
+            <Label htmlFor="documento">Documento</Label>
             <Input
-              id="cuit"
+              id="documento"
               type="text"
-              value={formData.cuit}
-              onChange={(e) => setFormData({ ...formData, cuit: e.target.value })}
-              placeholder="30-12345678-9"
+              value={formData.documento}
+              onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
+              placeholder="12345678"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="fechaAlta">Fecha de Alta</Label>
+            <Label htmlFor="fecha_alta">Fecha de Alta</Label>
             <Input
-              id="fechaAlta"
+              id="fecha_alta"
               type="date"
-              value={formData.fechaAlta}
-              onChange={(e) => setFormData({ ...formData, fechaAlta: e.target.value })}
+              value={formData.fecha_alta}
+              onChange={(e) => setFormData({ ...formData, fecha_alta: e.target.value })}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="direccion">Dirección</Label>
+            <Label htmlFor="correo">Correo electrónico</Label>
             <Input
-              id="direccion"
+              id="correo"
               type="text"
-              value={formData.direccion}
-              onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-              required
+              value={formData.correo || ""}
+              onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
+              placeholder="correo@proveedor.com"
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Calificación (1 a 5)</Label>
-            <div className="flex gap-2">
-              {[1, 2, 3, 4, 5].map((rating) => (
-                <button
-                  key={rating}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, calificacion: rating })}
-                  className="focus:outline-none"
-                >
-                  <Star
-                    className={`w-8 h-8 transition-colors ${
-                      rating <= formData.calificacion
-                        ? "fill-yellow-400 text-yellow-400"
-                        : "text-gray-300 hover:text-yellow-200"
-                    }`}
-                  />
-                </button>
-              ))}
+            <Label htmlFor="telefono">Teléfono</Label>
+            <Input
+              id="telefono"
+              type="text"
+              value={formData.telefono || ""}
+              onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+              placeholder="11-1234-5678"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="calle">Calle</Label>
+            <Input
+              id="calle"
+              type="text"
+              value={formData.calle}
+              onChange={(e) => setFormData({ ...formData, calle: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="numero">Número</Label>
+              <Input
+                id="numero"
+                type="number"
+                value={formData.numero}
+                onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                min="0"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="departamento">Departamento</Label>
+              <Input
+                id="departamento"
+                type="text"
+                value={formData.departamento || ""}
+                onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="codigo_postal">Código Postal</Label>
+              <Input
+                id="codigo_postal"
+                type="text"
+                value={formData.codigo_postal || ""}
+                onChange={(e) => setFormData({ ...formData, codigo_postal: e.target.value })}
+              />
             </div>
           </div>
 

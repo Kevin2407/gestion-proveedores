@@ -1,41 +1,122 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { X } from "lucide-react"
+import { useMemo, useState, useEffect } from "react"
+import { X, Trash2, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export default function OrderModal({ isOpen, onClose, onSave, order }) {
+const estadoOptions = ["Pendiente", "En proceso", "En tránsito", "Entregado", "Cancelado"]
+
+export default function OrderModal({ isOpen, onClose, onSave, order, providers = [], products = [] }) {
   const [formData, setFormData] = useState({
-    numero: "",
-    proveedor: "",
-    fecha: new Date().toISOString().split("T")[0],
-    monto: "",
+    id_orden: null,
+    id_proveedor: "",
+    fecha_pedido: new Date().toISOString().split("T")[0],
+    fecha_entrega: "",
     estado: "Pendiente",
-    descripcion: "",
   })
+  const [items, setItems] = useState([
+    { id_producto: "", cantidad: 1, precio_unitario: "" },
+  ])
 
   useEffect(() => {
     if (order) {
-      setFormData(order)
+      setFormData({
+        id_orden: order.id_orden,
+        id_proveedor: order.id_proveedor?.toString() || "",
+        fecha_pedido: order.fecha_pedido ? order.fecha_pedido.slice(0, 10) : new Date().toISOString().split("T")[0],
+        fecha_entrega: order.fecha_entrega ? order.fecha_entrega.slice(0, 10) : "",
+        estado: order.estado || "Pendiente",
+      })
+      setItems(
+        order.detalles && order.detalles.length > 0
+          ? order.detalles.map((detail) => ({
+              id_producto: detail.id_producto?.toString() || "",
+              cantidad: detail.cantidad?.toString() || "1",
+              precio_unitario: detail.precio_unitario?.toString() || "",
+            }))
+          : [{ id_producto: "", cantidad: 1, precio_unitario: "" }]
+      )
     } else {
       setFormData({
-        numero: "",
-        proveedor: "",
-        fecha: new Date().toISOString().split("T")[0],
-        monto: "",
+        id_orden: null,
+        id_proveedor: "",
+        fecha_pedido: new Date().toISOString().split("T")[0],
+        fecha_entrega: "",
         estado: "Pendiente",
-        descripcion: "",
       })
+      setItems([{ id_producto: "", cantidad: 1, precio_unitario: "" }])
     }
   }, [order, isOpen])
 
+  const handleItemChange = (index, field, value) => {
+    setItems((prev) => {
+      const next = [...prev]
+      next[index] = { ...next[index], [field]: value }
+      return next
+    })
+  }
+
+  const handleAddItem = () => {
+    setItems((prev) => [...prev, { id_producto: "", cantidad: 1, precio_unitario: "" }])
+  }
+
+  const handleRemoveItem = (index) => {
+    setItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const total = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const quantity = Number(item.cantidad)
+      const unit = Number(item.precio_unitario)
+      if (Number.isNaN(quantity) || Number.isNaN(unit)) {
+        return sum
+      }
+      return sum + quantity * unit
+    }, 0)
+  }, [items])
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+    }).format(value || 0)
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
+
+    const preparedItems = items
+      .map((item) => ({
+        id_producto: item.id_producto ? Number(item.id_producto) : null,
+        cantidad: parseInt(item.cantidad, 10),
+        precio_unitario: Number(item.precio_unitario),
+      }))
+      .filter(
+        (item) =>
+          item.id_producto &&
+          !Number.isNaN(item.cantidad) &&
+          !Number.isNaN(item.precio_unitario) &&
+          item.cantidad > 0 &&
+          item.precio_unitario > 0
+      )
+
+    if (preparedItems.length === 0) {
+      alert("La orden debe incluir al menos un producto válido")
+      return
+    }
+
+    if (!formData.id_proveedor) {
+      alert("Seleccione un proveedor")
+      return
+    }
+
     onSave({
       ...formData,
-      monto: parseFloat(formData.monto),
+      id_proveedor: Number(formData.id_proveedor),
+      fecha_entrega: formData.fecha_entrega || null,
+      items: preparedItems,
     })
   }
 
@@ -55,61 +136,41 @@ export default function OrderModal({ isOpen, onClose, onSave, order }) {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="numero">Número de Orden</Label>
-            <Input
-              id="numero"
-              type="text"
-              value={formData.numero}
-              onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-              placeholder="OC-2024-001"
+            <Label htmlFor="id_proveedor">Proveedor</Label>
+            <select
+              id="id_proveedor"
+              value={formData.id_proveedor}
+              onChange={(e) => setFormData({ ...formData, id_proveedor: e.target.value })}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               required
-            />
+            >
+              <option value="">Seleccionar proveedor</option>
+              {providers.map((provider) => (
+                <option key={provider.id_proveedor} value={provider.id_proveedor}>
+                  {provider.nombre}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="proveedor">Proveedor</Label>
+            <Label htmlFor="fecha_pedido">Fecha del pedido</Label>
             <Input
-              id="proveedor"
-              type="text"
-              value={formData.proveedor}
-              onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="fecha">Fecha</Label>
-            <Input
-              id="fecha"
+              id="fecha_pedido"
               type="date"
-              value={formData.fecha}
-              onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+              value={formData.fecha_pedido}
+              onChange={(e) => setFormData({ ...formData, fecha_pedido: e.target.value })}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="descripcion">Descripción</Label>
+            <Label htmlFor="fecha_entrega">Fecha estimada de entrega (opcional)</Label>
             <Input
-              id="descripcion"
-              type="text"
-              value={formData.descripcion}
-              onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-              placeholder="Notebooks HP EliteBook x10"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="monto">Monto (ARS)</Label>
-            <Input
-              id="monto"
-              type="number"
-              step="0.01"
-              value={formData.monto}
-              onChange={(e) => setFormData({ ...formData, monto: e.target.value })}
-              placeholder="250000"
-              required
+              id="fecha_entrega"
+              type="date"
+              value={formData.fecha_entrega}
+              onChange={(e) => setFormData({ ...formData, fecha_entrega: e.target.value })}
             />
           </div>
 
@@ -122,11 +183,83 @@ export default function OrderModal({ isOpen, onClose, onSave, order }) {
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               required
             >
-              <option value="Pendiente">Pendiente</option>
-              <option value="En tránsito">En tránsito</option>
-              <option value="Entregado">Entregado</option>
-              <option value="Cancelado">Cancelado</option>
+              {estadoOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
             </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Productos incluidos</Label>
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                  <div className="sm:col-span-4">
+                    <Label className="text-xs">Producto</Label>
+                    <select
+                      value={item.id_producto}
+                      onChange={(e) => handleItemChange(index, "id_producto", e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      required
+                    >
+                      <option value="">Seleccionar</option>
+                      {products.map((product) => (
+                        <option key={product.id_producto} value={product.id_producto}>
+                          {product.nombre_producto}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <Label className="text-xs" htmlFor={`cantidad-${index}`}>
+                      Cantidad
+                    </Label>
+                    <Input
+                      id={`cantidad-${index}`}
+                      type="number"
+                      min="1"
+                      value={item.cantidad}
+                      onChange={(e) => handleItemChange(index, "cantidad", e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <Label className="text-xs" htmlFor={`precio-${index}`}>
+                      Precio unitario
+                    </Label>
+                    <Input
+                      id={`precio-${index}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.precio_unitario}
+                      onChange={(e) => handleItemChange(index, "precio_unitario", e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="sm:col-span-2 text-sm text-muted-foreground font-medium">
+                    Subtotal: {formatCurrency((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}
+                  </div>
+                  <div className="sm:col-span-12 flex justify-end">
+                    {items.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveItem(index)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={handleAddItem} className="flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Agregar producto
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between rounded-md border border-dashed border-muted px-4 py-3 bg-muted/30 text-sm">
+            <span className="font-semibold text-muted-foreground">Total estimado</span>
+            <span className="text-foreground font-semibold">{formatCurrency(total)}</span>
           </div>
 
           <div className="flex gap-3 pt-4">

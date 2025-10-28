@@ -6,26 +6,30 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export default function RatingModal({ isOpen, onClose, onSave, rating }) {
+export default function RatingModal({ isOpen, onClose, onSave, rating, providers = [] }) {
   const [formData, setFormData] = useState({
-    proveedor: "",
-    fecha: new Date().toISOString().split("T")[0],
-    calificacion: 5,
-    aspecto: "",
-    evaluador: "",
+    id_calificacion: null,
+    id_proveedor: "",
+    fecha_evaluacion: new Date().toISOString().split("T")[0],
+    puntaje: 5,
     comentarios: "",
   })
 
   useEffect(() => {
     if (rating) {
-      setFormData(rating)
+        setFormData({
+        id_calificacion: rating.id_calificacion,
+        id_proveedor: rating.id_proveedor?.toString() || "",
+        fecha_evaluacion: rating.fecha_evaluacion ? rating.fecha_evaluacion.slice(0, 10) : new Date().toISOString().split("T")[0],
+        puntaje: Number(rating.puntaje) || 5,
+        comentarios: rating.comentarios || "",
+      })
     } else {
       setFormData({
-        proveedor: "",
-        fecha: new Date().toISOString().split("T")[0],
-        calificacion: 5,
-        aspecto: "",
-        evaluador: "",
+        id_calificacion: null,
+        id_proveedor: "",
+        fecha_evaluacion: new Date().toISOString().split("T")[0],
+        puntaje: 5,
         comentarios: "",
       })
     }
@@ -33,7 +37,18 @@ export default function RatingModal({ isOpen, onClose, onSave, rating }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSave(formData)
+    const payload = {
+      ...formData,
+      id_proveedor: formData.id_proveedor ? Number(formData.id_proveedor) : null,
+      puntaje: Number(formData.puntaje),
+    }
+
+    if (!payload.id_proveedor) {
+      alert("Debe seleccionar un proveedor")
+      return
+    }
+
+    onSave(payload)
   }
 
   if (!isOpen) return null
@@ -52,44 +67,32 @@ export default function RatingModal({ isOpen, onClose, onSave, rating }) {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="proveedor">Proveedor</Label>
-            <Input
-              id="proveedor"
-              type="text"
-              value={formData.proveedor}
-              onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="fecha">Fecha de Evaluación</Label>
-            <Input
-              id="fecha"
-              type="date"
-              value={formData.fecha}
-              onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="aspecto">Aspecto Evaluado</Label>
+            <Label htmlFor="id_proveedor">Proveedor</Label>
             <select
-              id="aspecto"
-              value={formData.aspecto}
-              onChange={(e) => setFormData({ ...formData, aspecto: e.target.value })}
+              id="id_proveedor"
+              value={formData.id_proveedor}
+              onChange={(e) => setFormData({ ...formData, id_proveedor: e.target.value })}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               required
             >
-              <option value="">Seleccionar aspecto</option>
-              <option value="Calidad de productos">Calidad de productos</option>
-              <option value="Tiempo de entrega">Tiempo de entrega</option>
-              <option value="Servicio postventa">Servicio postventa</option>
-              <option value="Atención al cliente">Atención al cliente</option>
-              <option value="Precios">Precios</option>
-              <option value="Soporte técnico">Soporte técnico</option>
+              <option value="">Seleccionar proveedor</option>
+              {providers.map((provider) => (
+                <option key={provider.id_proveedor} value={provider.id_proveedor}>
+                  {provider.nombre}
+                </option>
+              ))}
             </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="fecha_evaluacion">Fecha de Evaluación</Label>
+            <Input
+              id="fecha_evaluacion"
+              type="date"
+              value={formData.fecha_evaluacion}
+              onChange={(e) => setFormData({ ...formData, fecha_evaluacion: e.target.value })}
+              required
+            />
           </div>
 
           <div className="space-y-2">
@@ -99,12 +102,12 @@ export default function RatingModal({ isOpen, onClose, onSave, rating }) {
                 <button
                   key={score}
                   type="button"
-                  onClick={() => setFormData({ ...formData, calificacion: score })}
+                  onClick={() => setFormData({ ...formData, puntaje: score })}
                   className="focus:outline-none"
                 >
                   <Star
                     className={`w-8 h-8 transition-colors ${
-                      score <= formData.calificacion
+                      score <= formData.puntaje
                         ? "fill-yellow-400 text-yellow-400"
                         : "text-gray-300 hover:text-yellow-200"
                     }`}
@@ -112,19 +115,7 @@ export default function RatingModal({ isOpen, onClose, onSave, rating }) {
                 </button>
               ))}
             </div>
-            <p className="text-sm text-muted-foreground">Puntuación: {formData.calificacion}/5</p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="evaluador">Evaluador</Label>
-            <Input
-              id="evaluador"
-              type="text"
-              value={formData.evaluador}
-              onChange={(e) => setFormData({ ...formData, evaluador: e.target.value })}
-              placeholder="Nombre del evaluador"
-              required
-            />
+            <p className="text-sm text-muted-foreground">Puntuación: {formData.puntaje}/5</p>
           </div>
 
           <div className="space-y-2">
@@ -135,7 +126,6 @@ export default function RatingModal({ isOpen, onClose, onSave, rating }) {
               onChange={(e) => setFormData({ ...formData, comentarios: e.target.value })}
               className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               placeholder="Escriba sus comentarios sobre la evaluación..."
-              required
             />
           </div>
 

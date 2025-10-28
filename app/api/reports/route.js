@@ -1,161 +1,104 @@
-import { getConnection, sql } from '@/lib/db'
+import { getConnection } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
-// GET - Obtener estadísticas para reportes ejecutivos
-export async function GET(request) {
+export async function GET() {
   try {
     const pool = await getConnection()
-    
-    // Ejecutar múltiples consultas para obtener estadísticas
-    const stats = {}
-    
-    // Total de proveedores
-    const providersResult = await pool.request()
-      .query('SELECT COUNT(*) AS total FROM Proveedor')
-    stats.totalProveedores = providersResult.recordset[0].total
-    
-    // Contratos vigentes (no vencidos)
-    const contractsResult = await pool.request()
-      .query(`
-        SELECT COUNT(*) AS total 
-        FROM Contrato 
-        WHERE fecha_vencimiento >= GETDATE()
-      `)
-    stats.contratosVigentes = contractsResult.recordset[0].total
-    
-    // Órdenes del mes actual
-    const ordersResult = await pool.request()
-      .query(`
-        SELECT COUNT(*) AS total 
-        FROM Orden_De_Compra 
-        WHERE MONTH(fecha_pedido) = MONTH(GETDATE()) 
-        AND YEAR(fecha_pedido) = YEAR(GETDATE())
-      `)
-    stats.ordenesDelMes = ordersResult.recordset[0].total
-    
-    // Gasto total del mes
-    const spendingResult = await pool.request()
-      .query(`
-        SELECT ISNULL(SUM(monto_total), 0) AS total 
-        FROM Orden_De_Compra 
-        WHERE MONTH(fecha_pedido) = MONTH(GETDATE()) 
-        AND YEAR(fecha_pedido) = YEAR(GETDATE())
-      `)
-    stats.gastoTotal = spendingResult.recordset[0].total
-    
-    // Total equipos adquiridos
-    const equipmentResult = await pool.request()
-      .query('SELECT COUNT(*) AS total FROM Equipo_Adquirido')
-    stats.totalEquipos = equipmentResult.recordset[0].total
-    
-    // Incidencias abiertas (pendientes)
-    const incidentsResult = await pool.request()
-      .query(`
-        SELECT COUNT(*) AS total 
-        FROM Incidencia 
-        WHERE estado = 'Pendiente'
-      `)
-    stats.incidenciasAbiertas = incidentsResult.recordset[0].total
-    
-    // Calificación promedio
-    const ratingsResult = await pool.request()
-      .query(`
-        SELECT ISNULL(AVG(CAST(puntaje AS FLOAT)), 0) AS promedio 
-        FROM Calificacion
-      `)
-    stats.calificacionPromedio = ratingsResult.recordset[0].promedio
-    
-    // Garantías por vencer (próximos 30 días)
-    const warrantyResult = await pool.request()
-      .query(`
-        SELECT COUNT(*) AS total 
-        FROM Equipo_Adquirido 
-        WHERE fecha_vencimiento_garantia BETWEEN GETDATE() AND DATEADD(day, 30, GETDATE())
-      `)
-    stats.garantiasPorVencer = warrantyResult.recordset[0].total
-    
-    // Top 3 proveedores (por número de órdenes)
-    const topProvidersResult = await pool.request()
-      .query(`
-        SELECT TOP 3
-          p.id_proveedor,
-          p.nombre,
-          COUNT(o.id_orden) AS total_ordenes,
-          ISNULL(SUM(o.monto_total), 0) AS monto_total,
-          ISNULL(AVG(CAST(c.puntaje AS FLOAT)), 0) AS calificacion_promedio
-        FROM Proveedor p
-        LEFT JOIN Orden_De_Compra o ON p.id_proveedor = o.id_proveedor
-        LEFT JOIN Calificacion c ON p.id_proveedor = c.id_proveedor
-        GROUP BY p.id_proveedor, p.nombre
-        ORDER BY total_ordenes DESC, monto_total DESC
-      `)
-    stats.topProveedores = topProvidersResult.recordset
-    
-    // Actividad reciente (últimas 10 acciones)
-    const recentActivityResult = await pool.request()
-      .query(`
-        SELECT TOP 10 * FROM (
-          SELECT 
-            'orden' AS tipo,
-            'Nueva orden de compra' AS descripcion,
-            fecha_pedido AS fecha
-          FROM Orden_De_Compra
-          
-          UNION ALL
-          
-          SELECT 
-            'incidencia' AS tipo,
-            'Incidencia reportada' AS descripcion,
-            fecha_reportaje AS fecha
-          FROM Incidencia
-          
-          UNION ALL
-          
-          SELECT 
-            'calificacion' AS tipo,
-            'Nueva calificación' AS descripcion,
-            fecha_evaluacion AS fecha
-          FROM Calificacion
-          
-          UNION ALL
-          
-          SELECT 
-            'contrato' AS tipo,
-            'Contrato creado' AS descripcion,
-            fecha_inicio AS fecha
-          FROM Contrato
-        ) AS actividades
-        ORDER BY fecha DESC
-      `)
-    stats.actividadReciente = recentActivityResult.recordset
-    
-    // Distribución de estados de equipos
-    const equipmentStatusResult = await pool.request()
-      .query(`
-        SELECT 
-          estado,
-          COUNT(*) AS cantidad
-        FROM Equipo_Adquirido
-        GROUP BY estado
-      `)
-    stats.distribucionEstadosEquipos = equipmentStatusResult.recordset
-    
-    // Órdenes por estado
-    const ordersStatusResult = await pool.request()
-      .query(`
-        SELECT 
-          estado,
-          COUNT(*) AS cantidad
-        FROM Orden_De_Compra
-        GROUP BY estado
-      `)
-    stats.ordenesPorEstado = ordersStatusResult.recordset
-    
+
+    const totalsResult = await pool.request().query(`
+      SELECT 
+        (SELECT COUNT(*) FROM Proveedor) AS total_proveedores,
+        (SELECT COUNT(*) FROM Tecnico) AS total_tecnicos,
+        (SELECT COUNT(*) FROM Producto) AS total_productos,
+        (SELECT COUNT(*) FROM Orden_De_Compra) AS total_ordenes,
+        (SELECT COUNT(*) FROM Calificacion) AS total_calificaciones,
+        (SELECT COUNT(*) FROM Falla_Proveedor) AS total_fallas,
+        (SELECT ISNULL(AVG(CAST(puntaje AS FLOAT)), 0) FROM Calificacion) AS promedio_calificaciones,
+        (SELECT ISNULL(SUM(monto_total), 0) FROM Orden_De_Compra WHERE MONTH(fecha_pedido) = MONTH(GETDATE()) AND YEAR(fecha_pedido) = YEAR(GETDATE())) AS gasto_mes_actual
+    `)
+
+    const topRatingsResult = await pool.request().query(`
+      SELECT 
+        p.id_proveedor,
+        per.nombre,
+        c.puntaje,
+        c.fecha_evaluacion,
+        c.comentarios
+      FROM Proveedor p
+        INNER JOIN Persona per ON p.id_persona = per.id_persona
+        INNER JOIN Calificacion c ON p.id_proveedor = c.id_proveedor
+      WHERE c.puntaje = (
+        SELECT MAX(c2.puntaje) FROM Calificacion c2
+      )
+      ORDER BY c.fecha_evaluacion DESC, c.id_calificacion DESC
+    `)
+
+    const providersWithoutFailsResult = await pool.request().query(`
+      SELECT 
+        p.id_proveedor,
+        per.nombre,
+        per.correo,
+        per.telefono,
+        p.fecha_alta
+      FROM Proveedor p
+        INNER JOIN Persona per ON p.id_persona = per.id_persona
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM Falla_Proveedor f
+        WHERE f.id_proveedor = p.id_proveedor
+      )
+      ORDER BY per.nombre ASC
+    `)
+
+    const ordersByStatusResult = await pool.request().query(`
+      SELECT 
+        estado,
+        COUNT(*) AS cantidad,
+        ISNULL(SUM(monto_total), 0) AS monto_total
+      FROM Orden_De_Compra
+      GROUP BY estado
+    `)
+
+    const auditResult = await pool.request().query(`
+      SELECT TOP 10
+        a.id_auditoria,
+        a.id_orden,
+        a.id_proveedor,
+        per.nombre AS proveedor_nombre,
+        a.fecha_pedido,
+        a.estado,
+        a.fecha_auditoria,
+        a.accion
+      FROM Auditoria_Ordenes a
+        LEFT JOIN Proveedor p ON a.id_proveedor = p.id_proveedor
+        LEFT JOIN Persona per ON p.id_persona = per.id_persona
+      ORDER BY a.fecha_auditoria DESC
+    `)
+
+    const recentOrdersResult = await pool.request().query(`
+      SELECT TOP 5
+        o.id_orden,
+        o.fecha_pedido,
+        o.monto_total,
+        o.estado,
+        per.nombre AS proveedor_nombre
+      FROM Orden_De_Compra o
+        INNER JOIN Proveedor p ON o.id_proveedor = p.id_proveedor
+        INNER JOIN Persona per ON p.id_persona = per.id_persona
+      ORDER BY o.fecha_pedido DESC, o.id_orden DESC
+    `)
+
     return NextResponse.json({
       success: true,
-      data: stats
+      data: {
+        totales: totalsResult.recordset[0],
+        mejoresCalificaciones: topRatingsResult.recordset,
+        proveedoresSinFallas: providersWithoutFailsResult.recordset,
+        ordenesPorEstado: ordersByStatusResult.recordset,
+        auditoriaOrdenes: auditResult.recordset,
+        ordenesRecientes: recentOrdersResult.recordset,
+      },
     })
-    
   } catch (error) {
     console.error('Error en GET /api/reports:', error)
     return NextResponse.json(

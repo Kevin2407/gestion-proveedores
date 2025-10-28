@@ -6,36 +6,52 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export default function TechnicianModal({ isOpen, onClose, onSave, technician }) {
+export default function TechnicianModal({ isOpen, onClose, onSave, technician, specialties = [] }) {
   const [formData, setFormData] = useState({
+    id_tecnico: null,
+    id_persona: null,
     nombre: "",
-    especialidad: "",
-    proveedor: "",
+    documento: "",
+    correo: "",
     telefono: "",
-    email: "",
-    certificaciones: "",
-    estado: "Activo",
+    especialidades: [],
   })
 
   useEffect(() => {
     if (technician) {
-      setFormData(technician)
+      setFormData({
+        id_tecnico: technician.id_tecnico,
+        id_persona: technician.id_persona,
+        nombre: technician.nombre || "",
+        documento: technician.documento || "",
+        correo: technician.correo || "",
+        telefono: technician.telefono || "",
+        especialidades: (technician.especialidades || []).map((esp) => esp.id_especialidad.toString()),
+      })
     } else {
       setFormData({
+        id_tecnico: null,
+        id_persona: null,
         nombre: "",
-        especialidad: "",
-        proveedor: "",
+        documento: "",
+        correo: "",
         telefono: "",
-        email: "",
-        certificaciones: "",
-        estado: "Activo",
+        especialidades: [],
       })
     }
   }, [technician, isOpen])
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSave(formData)
+    if (!formData.nombre || !formData.documento) {
+      alert("Nombre y documento son obligatorios")
+      return
+    }
+
+    onSave({
+      ...formData,
+      especialidades: formData.especialidades.map((id) => Number(id)),
+    })
   }
 
   if (!isOpen) return null
@@ -66,77 +82,78 @@ export default function TechnicianModal({ isOpen, onClose, onSave, technician })
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="especialidad">Especialidad</Label>
+            <Label htmlFor="documento">Documento</Label>
             <Input
-              id="especialidad"
+              id="documento"
               type="text"
-              value={formData.especialidad}
-              onChange={(e) => setFormData({ ...formData, especialidad: e.target.value })}
-              placeholder="Reparación de notebooks"
+              value={formData.documento}
+              onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
+              placeholder="12345678"
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="proveedor">Proveedor</Label>
-            <Input
-              id="proveedor"
-              type="text"
-              value={formData.proveedor}
-              onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
-              required
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="correo">Correo electrónico</Label>
+              <Input
+                id="correo"
+                type="email"
+                value={formData.correo}
+                onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
+                placeholder="tecnico@empresa.com.ar"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="telefono">Teléfono</Label>
+              <Input
+                id="telefono"
+                type="text"
+                value={formData.telefono}
+                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                placeholder="11-4567-8901"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="telefono">Teléfono</Label>
-            <Input
-              id="telefono"
-              type="tel"
-              value={formData.telefono}
-              onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-              placeholder="+54 11 4567-8901"
-              required
-            />
+            <Label>Especialidades</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto rounded-md border border-border p-3">
+              {specialties.length === 0 && (
+                <span className="text-xs text-muted-foreground">No hay especialidades registradas</span>
+              )}
+              {specialties.map((specialty) => {
+                const isSelected = formData.especialidades.includes(specialty.id_especialidad.toString())
+                return (
+                  <label key={specialty.id_especialidad} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked
+                        setFormData((prev) => {
+                          if (isChecked) {
+                            return {
+                              ...prev,
+                              especialidades: [...prev.especialidades, specialty.id_especialidad.toString()],
+                            }
+                          }
+                          return {
+                            ...prev,
+                            especialidades: prev.especialidades.filter((id) => id !== specialty.id_especialidad.toString()),
+                          }
+                        })
+                      }}
+                    />
+                    <span>{specialty.especialidad}</span>
+                  </label>
+                )
+              })}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="tecnico@empresa.com.ar"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="certificaciones">Certificaciones</Label>
-            <Input
-              id="certificaciones"
-              type="text"
-              value={formData.certificaciones}
-              onChange={(e) => setFormData({ ...formData, certificaciones: e.target.value })}
-              placeholder="HP Certified, Dell Authorized"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="estado">Estado</Label>
-            <select
-              id="estado"
-              value={formData.estado}
-              onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              required
-            >
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo</option>
-              <option value="Suspendido">Suspendido</option>
-            </select>
+          <div className="text-xs text-muted-foreground">
+            Las especialidades seleccionadas se asociarán al técnico en la tabla Tecnico_Especialidad.
           </div>
 
           <div className="flex gap-3 pt-4">

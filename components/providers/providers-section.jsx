@@ -1,12 +1,49 @@
-// Ejemplo de cómo modificar providers-section.jsx para usar la API
-
 "use client"
 
-import { useState, useEffect } from "react"
-import { Search, Plus, Eye, Pencil, Trash2, Star } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Search, Plus, Pencil, Trash2, Star, MapPin, Mail, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import ProviderModal from "@/components/providers/provider-modal"
+
+const formatDate = (value) => {
+  if (!value) return "-"
+  return new Date(value).toLocaleDateString("es-AR")
+}
+
+const formatAddress = (provider) => {
+  if (!provider.calle) return "Sin dirección registrada"
+  const parts = [provider.calle]
+  if (provider.numero) parts.push(`#${provider.numero}`)
+  if (provider.departamento) parts.push(`Depto. ${provider.departamento}`)
+  if (provider.codigo_postal) parts.push(`CP ${provider.codigo_postal}`)
+  return parts.join(" ")
+}
+
+const renderAverage = (value) => {
+  if (value === null || value === undefined) {
+    return <span className="text-xs text-muted-foreground">Sin datos</span>
+  }
+
+  const numeric = Number(value)
+  if (Number.isNaN(numeric)) {
+    return <span className="text-xs text-muted-foreground">Sin datos</span>
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex gap-0.5">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`w-4 h-4 ${star <= Math.round(numeric) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+          />
+        ))}
+      </div>
+      <span className="text-xs text-muted-foreground">{numeric.toFixed(1)}/5</span>
+    </div>
+  )
+}
 
 export default function ProvidersSection() {
   const [providers, setProviders] = useState([])
@@ -16,123 +53,95 @@ export default function ProvidersSection() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Cargar proveedores al montar el componente
   useEffect(() => {
     fetchProviders()
   }, [])
 
-  // GET - Obtener todos los proveedores
   const fetchProviders = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/providers')
-      const { success, data } = await response.json()
+      setError(null)
+      const response = await fetch("/api/providers")
+      const data = await response.json()
 
-      if (success) {
-        setProviders(data)
-      } else {
-        setError('Error al cargar proveedores')
+      if (!data.success) {
+        throw new Error(data.error || "No se pudo obtener la lista de proveedores")
       }
-    } catch (error) {
-      console.error('Error fetching providers:', error)
-      setError('Error de conexión')
+
+      setProviders(data.data)
+    } catch (err) {
+      console.error("Error fetching providers:", err)
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredProviders = providers.filter(
-    (provider) =>
-      provider.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      provider.cuit.includes(searchTerm),
-  )
+  const filteredProviders = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) return providers
 
-  // POST o PUT - Crear o actualizar proveedor
-  const handleAddProvider = async (newProvider) => {
+    return providers.filter((provider) => {
+      return (
+        provider.nombre.toLowerCase().includes(term) ||
+        (provider.documento || "").toLowerCase().includes(term) ||
+        (provider.correo || "").toLowerCase().includes(term)
+      )
+    })
+  }, [providers, searchTerm])
+
+  const handleSaveProvider = async (payload) => {
     try {
+      const method = editingProvider ? "PUT" : "POST"
+      const response = await fetch("/api/providers", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || "No se pudo guardar el proveedor")
+      }
+
       if (editingProvider) {
-        // UPDATE
-        const response = await fetch('/api/providers', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id_proveedor: editingProvider.id_proveedor,
-            nombre: newProvider.nombre,
-            cuit: newProvider.cuit,
-            fecha_alta: newProvider.fechaAlta
-          })
-        })
-
-        const { success, data } = await response.json()
-
-        if (success) {
-          setProviders(providers.map((p) =>
-            p.id_proveedor === editingProvider.id_proveedor ? data : p
-          ))
-          setEditingProvider(null)
-        }
+        setProviders((prev) =>
+          prev.map((provider) => (provider.id_proveedor === data.data.id_proveedor ? data.data : provider))
+        )
       } else {
-        // CREATE
-        const response = await fetch('/api/providers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nombre: newProvider.nombre,
-            cuit: newProvider.cuit,
-            fecha_alta: newProvider.fechaAlta
-          })
-        })
-
-        const { success, data } = await response.json()
-
-        if (success) {
-          setProviders([...providers, data])
-        }
+        setProviders((prev) => [...prev, data.data])
       }
 
       setIsModalOpen(false)
-    } catch (error) {
-      console.error('Error saving provider:', error)
-      alert('Error al guardar el proveedor')
+      setEditingProvider(null)
+    } catch (err) {
+      console.error("Error saving provider:", err)
+      alert(err.message)
     }
   }
 
-  const handleEdit = (provider) => {
-    setEditingProvider(provider)
-    setIsModalOpen(true)
-  }
+  const handleDelete = async (provider) => {
+    if (!confirm(`¿Eliminar definitivamente a ${provider.nombre}? Esta acción no se puede deshacer.`)) {
+      return
+    }
 
-  // DELETE - Eliminar proveedor
-  const handleDelete = async (id) => {
-    if (confirm("¿Está seguro de eliminar este proveedor?")) {
-      try {
-        const response = await fetch(`/api/providers?id=${id}`, {
-          method: 'DELETE'
-        })
+    try {
+      const response = await fetch(`/api/providers?id=${provider.id_proveedor}`, {
+        method: "DELETE",
+      })
 
-        const { success } = await response.json()
+      const data = await response.json()
 
-        if (success) {
-          setProviders(providers.filter((p) => p.id_proveedor !== id))
-        }
-      } catch (error) {
-        console.error('Error deleting provider:', error)
-        alert('Error al eliminar el proveedor')
+      if (!data.success) {
+        throw new Error(data.error || "No se pudo eliminar el proveedor")
       }
-    }
-  }
 
-  const renderStars = (rating) => {
-    return (
-      <div className="flex gap-0.5">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`w-4 h-4 ${star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
-          />
-        ))}
-      </div>
-    )
+      setProviders((prev) => prev.filter((item) => item.id_proveedor !== provider.id_proveedor))
+    } catch (err) {
+      console.error("Error deleting provider:", err)
+      alert(err.message)
+    }
   }
 
   if (loading) {
@@ -145,9 +154,9 @@ export default function ProvidersSection() {
 
   if (error) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
         <p className="text-red-600">{error}</p>
-        <Button onClick={fetchProviders} className="ml-4">Reintentar</Button>
+        <Button onClick={fetchProviders}>Reintentar</Button>
       </div>
     )
   }
@@ -171,7 +180,7 @@ export default function ProvidersSection() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
         <Input
           type="text"
-          placeholder="Buscar proveedor..."
+          placeholder="Buscar por nombre, documento o correo..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
@@ -180,12 +189,16 @@ export default function ProvidersSection() {
 
       <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[960px]">
             <thead className="bg-muted">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Nombre</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">CUIT</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Fecha de Alta</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Documento</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Contacto</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Dirección</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Fecha alta</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Promedio</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Última calificación</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Acciones</th>
               </tr>
             </thead>
@@ -193,20 +206,61 @@ export default function ProvidersSection() {
               {filteredProviders.map((provider) => (
                 <tr key={provider.id_proveedor} className="hover:bg-muted/50 transition-colors">
                   <td className="px-6 py-4 text-sm text-foreground font-medium">{provider.nombre}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{provider.cuit}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{provider.documento || "-"}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">
-                    {new Date(provider.fecha_alta).toLocaleDateString("es-AR")}
+                    <div className="flex flex-col gap-1">
+                      {provider.correo && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Mail className="w-3 h-3" />
+                          <span>{provider.correo}</span>
+                        </div>
+                      )}
+                      {provider.telefono && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Phone className="w-3 h-3" />
+                          <span>{provider.telefono}</span>
+                        </div>
+                      )}
+                      {!provider.correo && !provider.telefono && (
+                        <span className="text-xs text-muted-foreground">Sin contacto</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">
+                    <div className="flex items-start gap-2 text-xs">
+                      <MapPin className="w-3 h-3 mt-0.5" />
+                      <span>{formatAddress(provider)}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(provider.fecha_alta)}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{renderAverage(provider.promedio_puntaje)}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">
+                    {provider.ultima_puntaje !== null && provider.ultima_puntaje !== undefined ? (
+                      <div className="flex flex-col text-xs">
+                        <span className="font-semibold text-foreground">{Number(provider.ultima_puntaje).toFixed(1)}/5</span>
+                        <span>{formatDate(provider.ultima_fecha)}</span>
+                        {provider.ultima_comentario && (
+                          <span className="text-muted-foreground line-clamp-2">{provider.ultima_comentario}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sin registros</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => alert(`Ver detalles de ${provider.nombre}`)}>
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(provider)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(provider.id_proveedor)}>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(provider)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingProvider(provider)
+                          setIsModalOpen(true)
+                        }}
+                      >
+                        <Pencil className="w-4 h-4" />
                       </Button>
                     </div>
                   </td>
@@ -229,7 +283,7 @@ export default function ProvidersSection() {
           setIsModalOpen(false)
           setEditingProvider(null)
         }}
-        onSave={handleAddProvider}
+        onSave={handleSaveProvider}
         provider={editingProvider}
       />
     </div>
