@@ -1,30 +1,55 @@
-# Sistema de gestión proveedores
+# Sistema de Gestión de Proveedores
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+Aplicación web creada con Next.js para administrar proveedores, órdenes de compra y calificaciones, mostrando reportes asociados a las consignas del trabajo práctico 6 de la materia Implementacion de Bases de datos (consultas con subqueries, ejecución del stored procedure transaccional y auditoría mediante trigger).
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/kevins-projects-3895088f/v0-sistema-de-gestion-proveedores)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/kBIKAKfXsb7)
+## Alumnos
+- **Ceballos, Maria Emilia** - 56442
+- **Martin, Kevin** - 53315
+- **Longhino, Matias Gastón** - 53302
+- **Darelli, Damián Agustín** - 52781
 
-## Overview
+## Características principales
+- Reportes dedicados a:
+  - Proveedor con la última calificación más alta.
+  - Proveedores sin fallas registradas.
+  - Evidencia de ejecución del `SP_RegistrarOrden`.
+  - Auditoría generada por el trigger sobre `Orden_De_Compra`.
+- Interfaz que permite lanzar el stored procedure y visualizar el resultado.
+- APIs en Next.js conectadas a SQL Server mediante `mssql`.
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+## Requisitos previos
+- Node.js 18+ y pnpm (`npm install -g pnpm`).
+- SQL Server disponible en la misma máquina (por ejemplo, Docker con `mcr.microsoft.com/mssql/server:2022-latest`).
+- Base de datos, tablas, stored procedure y trigger ya creados.
 
-## Deployment
+## Configuración
+1. Clonar el repositorio.
+2. Instalar dependencias:
+   ```bash
+   pnpm install
+   ```
+3. Crear el archivo `.env.local`:
+   ```env
+   DB_SERVER=localhost
+   DB_PORT=1433
+   DB_DATABASE=TuBaseDeDatos
+   DB_USER=sa
+   DB_PASSWORD=TuPasswordSegura
+   DB_ENCRYPT=false
+   ```
+   Ajustar los valores según la configuración de SQL Server. Si usas Docker, expón el puerto 1433 y verifica que `sa` esté habilitado.
 
-Your project is live at:
+## Conexión a la base de datos
+- Verificar que SQL Server esté ejecutándose (`docker ps` o el método que uses).
+- Si se requiere probar la conexión manualmente:
+  ```bash
+  /opt/mssql-tools18/bin/sqlcmd -S localhost,1433 -U sa -P TuPasswordSegura -C
+  ```
+- La aplicación usará estos datos automáticamente a través del módulo `lib/db.js`.
 
-**[https://vercel.com/kevins-projects-3895088f/v0-sistema-de-gestion-proveedores](https://vercel.com/kevins-projects-3895088f/v0-sistema-de-gestion-proveedores)**
+## Ejecución
+```bash
+pnpm dev
+```
+Abrir [http://localhost:3000](http://localhost:3000) y navegar a **Reportes** para ejecutar el stored procedure y revisar las evidencias de las consignas.
 
-## Build your app
-
-Continue building your app on:
-
-**[https://v0.app/chat/projects/kBIKAKfXsb7](https://v0.app/chat/projects/kBIKAKfXsb7)**
-
-## How It Works
-
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository

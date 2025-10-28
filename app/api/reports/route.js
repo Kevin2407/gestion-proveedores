@@ -5,18 +5,7 @@ export async function GET() {
   try {
     const pool = await getConnection()
 
-    const totalsResult = await pool.request().query(`
-      SELECT 
-        (SELECT COUNT(*) FROM Proveedor) AS total_proveedores,
-        (SELECT COUNT(*) FROM Tecnico) AS total_tecnicos,
-        (SELECT COUNT(*) FROM Producto) AS total_productos,
-        (SELECT COUNT(*) FROM Orden_De_Compra) AS total_ordenes,
-        (SELECT COUNT(*) FROM Calificacion) AS total_calificaciones,
-        (SELECT COUNT(*) FROM Falla_Proveedor) AS total_fallas,
-        (SELECT ISNULL(AVG(CAST(puntaje AS FLOAT)), 0) FROM Calificacion) AS promedio_calificaciones,
-        (SELECT ISNULL(SUM(monto_total), 0) FROM Orden_De_Compra WHERE MONTH(fecha_pedido) = MONTH(GETDATE()) AND YEAR(fecha_pedido) = YEAR(GETDATE())) AS gasto_mes_actual
-    `)
-
+    // 4.a – Última calificación más alta registrada
     const topRatingsResult = await pool.request().query(`
       SELECT 
         p.id_proveedor,
@@ -33,6 +22,15 @@ export async function GET() {
       ORDER BY c.fecha_evaluacion DESC, c.id_calificacion DESC
     `)
 
+    const mejoresCalificaciones = topRatingsResult.recordset.map((item) => ({
+      id_proveedor: item.id_proveedor,
+      nombre: item.nombre,
+      puntaje: item.puntaje !== null ? Number(item.puntaje) : null,
+      fecha_evaluacion: item.fecha_evaluacion,
+      comentarios: item.comentarios,
+    }))
+
+    // 4.b – Proveedores sin fallas registradas
     const providersWithoutFailsResult = await pool.request().query(`
       SELECT 
         p.id_proveedor,
@@ -50,44 +48,18 @@ export async function GET() {
       ORDER BY per.nombre ASC
     `)
 
-    const ordersByStatusResult = await pool.request().query(`
-      SELECT 
-        estado,
-        COUNT(*) AS cantidad,
-        ISNULL(SUM(monto_total), 0) AS monto_total
-      FROM Orden_De_Compra
-      GROUP BY estado
-    `)
+    const proveedoresSinFallas = providersWithoutFailsResult.recordset.map((item) => ({
+      id_proveedor: item.id_proveedor,
+      nombre: item.nombre,
+      correo: item.correo,
+      telefono: item.telefono,
+      fecha_alta: item.fecha_alta,
+    }))
 
-    const auditResult = await pool.request().query(`
-      SELECT TOP 10
-        a.id_auditoria,
-        a.id_orden,
-        a.id_proveedor,
-        per.nombre AS proveedor_nombre,
-        a.fecha_pedido,
-        a.estado,
-        a.fecha_auditoria,
-        a.accion
-      FROM Auditoria_Ordenes a
-        LEFT JOIN Proveedor p ON a.id_proveedor = p.id_proveedor
-        LEFT JOIN Persona per ON p.id_persona = per.id_persona
-      ORDER BY a.fecha_auditoria DESC
-    `)
+    
 
-    const recentOrdersResult = await pool.request().query(`
-      SELECT TOP 5
-        o.id_orden,
-        o.fecha_pedido,
-        o.monto_total,
-        o.estado,
-        per.nombre AS proveedor_nombre
-      FROM Orden_De_Compra o
-        INNER JOIN Proveedor p ON o.id_proveedor = p.id_proveedor
-        INNER JOIN Persona per ON p.id_persona = per.id_persona
-      ORDER BY o.fecha_pedido DESC, o.id_orden DESC
-    `)
 
+    // 5 – Procedimiento almacenado SP_RegistrarOrden
     const storedProcedureOrderResult = await pool.request().query(`
       WITH OrdenCoincidentes AS (
         SELECT
@@ -157,40 +129,23 @@ export async function GET() {
       }
     }
 
-    const totalesRow = totalsResult.recordset[0] || {}
 
-    const totales = {
-      total_proveedores: Number(totalesRow.total_proveedores || 0),
-      total_tecnicos: Number(totalesRow.total_tecnicos || 0),
-      total_productos: Number(totalesRow.total_productos || 0),
-      total_ordenes: Number(totalesRow.total_ordenes || 0),
-      total_calificaciones: Number(totalesRow.total_calificaciones || 0),
-      total_fallas: Number(totalesRow.total_fallas || 0),
-      promedio_calificaciones: Number(totalesRow.promedio_calificaciones || 0),
-      gasto_mes_actual: Number(totalesRow.gasto_mes_actual || 0),
-    }
 
-    const mejoresCalificaciones = topRatingsResult.recordset.map((item) => ({
-      id_proveedor: item.id_proveedor,
-      nombre: item.nombre,
-      puntaje: item.puntaje !== null ? Number(item.puntaje) : null,
-      fecha_evaluacion: item.fecha_evaluacion,
-      comentarios: item.comentarios,
-    }))
-
-    const proveedoresSinFallas = providersWithoutFailsResult.recordset.map((item) => ({
-      id_proveedor: item.id_proveedor,
-      nombre: item.nombre,
-      correo: item.correo,
-      telefono: item.telefono,
-      fecha_alta: item.fecha_alta,
-    }))
-
-    const ordenesPorEstado = ordersByStatusResult.recordset.map((item) => ({
-      estado: item.estado,
-      cantidad: Number(item.cantidad || 0),
-      monto_total: Number(item.monto_total || 0),
-    }))
+    const auditResult = await pool.request().query(`
+      SELECT TOP 10
+        a.id_auditoria,
+        a.id_orden,
+        a.id_proveedor,
+        per.nombre AS proveedor_nombre,
+        a.fecha_pedido,
+        a.estado,
+        a.fecha_auditoria,
+        a.accion
+      FROM Auditoria_Ordenes a
+        LEFT JOIN Proveedor p ON a.id_proveedor = p.id_proveedor
+        LEFT JOIN Persona per ON p.id_persona = per.id_persona
+      ORDER BY a.fecha_auditoria DESC
+    `)
 
     const auditoriaOrdenes = auditResult.recordset.map((item) => ({
       id_auditoria: item.id_auditoria,
@@ -201,14 +156,6 @@ export async function GET() {
       estado: item.estado,
       fecha_auditoria: item.fecha_auditoria,
       accion: item.accion,
-    }))
-
-    const ordenesRecientes = recentOrdersResult.recordset.map((item) => ({
-      id_orden: item.id_orden,
-      fecha_pedido: item.fecha_pedido,
-      monto_total: item.monto_total !== null ? Number(item.monto_total) : 0,
-      estado: item.estado,
-      proveedor_nombre: item.proveedor_nombre,
     }))
 
     const consignas = {
@@ -227,7 +174,7 @@ export async function GET() {
       punto5: {
         titulo: 'Punto 5 – Procedimiento almacenado SP_RegistrarOrden',
         descripcion:
-          'Operacion transaccional que inserta una orden de compra con dos productos fijos, validando los detalles y exponiendo la lógica centralizada en SQL Server.',
+          'Operación transaccional que inserta una orden de compra con dos productos fijos, validando los detalles y exponiendo la lógica centralizada en SQL Server.',
         ultimaOrdenGenerada: storedProcedureOrder,
       },
       punto6: {
@@ -241,13 +188,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
-        totales,
         consignas,
-        mejoresCalificaciones,
-        proveedoresSinFallas,
-        ordenesPorEstado,
-        auditoriaOrdenes,
-        ordenesRecientes,
       },
     })
   } catch (error) {
